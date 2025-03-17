@@ -3,12 +3,18 @@
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEServer.h>
-#include "e85.h"
+#include <esp_now.h>
+#include <WiFi.h>
+//#include "e85.h"
+#include "e46.h"
 // #define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
 #include <esp_log.h>
 #include "esp_gatt_common_api.h"
 
 static const char *TAG = "racechrono_canbus_ble";
+
+// Receiver MAC Address (Set to broadcast or specific ESP32 MAC)
+uint8_t broadcastAddress[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
 #define CAN_POLLING_RATE_MS 1
 #define SERVICE_UUID "00001ff8-0000-1000-8000-00805f9b34fb"
@@ -21,19 +27,71 @@ bool isBleConnected = false;
 uint16_t conn_id = 0;  // Only valid when isBleConnected is true.
 BLECharacteristic *cbMainChar = nullptr;
 QueueHandle_t xQueue1;
+CarData carData;
 
+
+// ESP-NOW Callback
+void onSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+  if(status != ESP_NOW_SEND_SUCCESS)
+    Serial.printf("ESP-NOW Send Status: %s\n", status == ESP_NOW_SEND_SUCCESS ? "Success" : "Fail");
+}
+
+// Setup ESP-NOW
+void setupESPNow() {
+    WiFi.mode(WIFI_STA);
+    if (esp_now_init() != ESP_OK) {
+        Serial.println("ESP-NOW Init Failed");
+        ESP.restart();
+    }
+    esp_now_register_send_cb(onSent);
+
+    esp_now_peer_info_t peerInfo = {};
+    memcpy(peerInfo.peer_addr, broadcastAddress, 6);
+    peerInfo.channel = 0;
+    peerInfo.encrypt = false;
+
+    if (esp_now_add_peer(&peerInfo) != ESP_OK) {
+        Serial.println("Failed to add peer");
+    }
+}
+
+void sendDataTask(void *pvParameters) {
+    while (true) {
+        // Simulate data
+        carData.rpm = random(1000, 7000);
+        carData.oilTemp = random(80, 120);
+        carData.waterTemp = random(70, 110);
+        carData.accel = random(0, 100);
+        carData.brake = random(0, 100);
+        carData.clutch = random(0, 100);
+        carData.speed = random(0, 200);
+
+        // Send data via ESP-NOW
+        esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *)&carData, sizeof(carData));
+        if (result != ESP_OK) {
+            Serial.println("Failed to send ESP-NOW packet");
+        } else {
+          Serial.printf("Sent - RPM: %d, Oil Temp: %.1f, Water Temp: %.1f, Accel: %d%%, Brake: %d%%, Clutch: %d%%, Speed: %.1f km/h\n",
+              carData.rpm, carData.oilTemp, carData.waterTemp,
+              carData.accel, carData.brake, carData.clutch, carData.speed);
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Send every second
+    }
+}
 
 static bool canPidAllowed(uint32_t pid) {
   switch (pid) {
     case can_asc1_id:
-    case can_asc2_id:
+    //case can_asc2_id:
     case can_asc3_id:
-    case can_asc4_id:
-    case can_lws1_id:
+    //case can_asc4_id:
+    //case can_lws1_id:
     case can_dme1_id:
     case can_dme2_id:
-    case can_dme3_id:
+    //case can_dme3_id:
     case can_dme4_id:
+    case can_icl2_id:
     case can_icl3_id:
       return true;
   }
@@ -151,7 +209,7 @@ class MyServerCallbacks : public BLEServerCallbacks {
 
 
 void ble_setup() {
-  BLEDevice::init("💩💯👌😂 hi!");
+  BLEDevice::init("DRIFTFUN CANBUS");
   BLEDevice::setMTU(517);
   BLEDevice::setPower(ESP_PWR_LVL_P21);
   BLEDevice::setPower(ESP_PWR_LVL_P21);
@@ -381,6 +439,7 @@ void canBusLoop() {
     }
     if (!canPidAllowed(message.identifier)) {
       ++can_not_interested_count;
+      Serial.printf("Ignoring pid: %d\n", message.identifier);
       continue;
     }
     if (xQueueSend(xQueue1, &message, 0)) {
@@ -433,8 +492,10 @@ void setup() {
   xTaskCreatePinnedToCore(taskSendBle, "BLE messages sender", 16384, nullptr, 2, nullptr, 0);  // Core 0 has less other stuff running on it.
   ble_setup();
   canBusSetup();
+  setupESPNow();
+  xTaskCreatePinnedToCore(sendDataTask, "SendData", 4096, NULL, 1, NULL, 0);
   xTaskCreatePinnedToCore(taskCanBusLoop, "CAN bus reader", 16384, nullptr, 2, nullptr, 1);
-  xTaskCreatePinnedToCore(taskPrintStats, "Statistics printer", 16384, nullptr, 1, nullptr, 1);
+  //xTaskCreatePinnedToCore(taskPrintStats, "Statistics printer", 16384, nullptr, 1, nullptr, 1);
 }
 
 void taskCanBusLoop(void *) {
