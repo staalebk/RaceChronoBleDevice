@@ -39,6 +39,7 @@ void onSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
 // Setup ESP-NOW
 void setupESPNow() {
     WiFi.mode(WIFI_STA);
+    WiFi.setSleep(false);
     if (esp_now_init() != ESP_OK) {
         Serial.println("ESP-NOW Init Failed");
         ESP.restart();
@@ -58,6 +59,7 @@ void setupESPNow() {
 void sendDataTask(void *pvParameters) {
     while (true) {
         // Simulate data
+        /*
         carData.rpm = random(1000, 7000);
         carData.oilTemp = random(80, 120);
         carData.waterTemp = random(70, 110);
@@ -65,18 +67,21 @@ void sendDataTask(void *pvParameters) {
         carData.brake = random(0, 100);
         carData.clutch = random(0, 100);
         carData.speed = random(0, 200);
-
+        */
         // Send data via ESP-NOW
         esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *)&carData, sizeof(carData));
         if (result != ESP_OK) {
             Serial.println("Failed to send ESP-NOW packet");
         } else {
+          /*
           Serial.printf("Sent - RPM: %d, Oil Temp: %.1f, Water Temp: %.1f, Accel: %d%%, Brake: %d%%, Clutch: %d%%, Speed: %.1f km/h\n",
               carData.rpm, carData.oilTemp, carData.waterTemp,
               carData.accel, carData.brake, carData.clutch, carData.speed);
+          */
+          //Serial.print(".");
         }
 
-        vTaskDelay(pdMS_TO_TICKS(1000)); // Send every second
+        vTaskDelay(pdMS_TO_TICKS(30));
     }
 }
 
@@ -370,6 +375,56 @@ static void dumpTwaiMessage(const twai_message_t &message) {
   }
 }
 
+// **Utility function: Extract unsigned integer from bytes (Big-Endian)**
+uint32_t bytestouint(const uint8_t *data, uint8_t startByte, uint8_t length) {
+    uint32_t value = 0;
+    for (int i = 0; i < length; i++) {
+        value |= ((uint32_t)data[startByte + i]) << (8 * (length - 1 - i));
+    }
+    return value;
+}
+
+// **Utility function: Extract unsigned integer from bytes (Little-Endian)**
+uint32_t bytestouintle(const uint8_t *data, uint8_t startByte, uint8_t length) {
+    uint32_t value = 0;
+    for (int i = 0; i < length; i++) {
+        value |= ((uint32_t)data[startByte + i]) << (8 * i);
+    }
+    return value;
+}
+
+// **Utility function: Extract a single bit from a byte array**
+bool bitstouint(const uint8_t *data, uint8_t bitPosition) {
+    uint8_t byteIndex = bitPosition / 8;  // Find the byte that contains the bit
+    uint8_t bitIndex = bitPosition % 8;   // Find the bit inside the byte
+    return (data[byteIndex] >> bitIndex) & 1;
+}
+
+// **Parse CAN message and update receivedData struct**
+void parseCAN(twai_message_t &message) {
+    if (message.identifier == 809) {
+        // **Accelerator percentage** (Byte 5, full byte)
+        carData.accel = bytestouint(message.data, 5, 1) / 2.56;
+
+        // **Brake percentage** (Bit 55)
+        carData.brake = bitstouint(message.data, 55) * 100;
+
+        // **Clutch percentage** (Bit 31)
+        carData.clutch = bitstouint(message.data, 31) * 100;
+
+        // **Coolant temperature** (Byte 1)
+        carData.waterTemp = (bytestouint(message.data, 1, 1) * 0.75) - 48;
+    } 
+    else if (message.identifier == 790) {
+        // **RPM Calculation** (Little-Endian, Bytes 2-3)
+        carData.rpm = bytestouintle(message.data, 2, 2) * 0.15625;
+    } 
+    else if (message.identifier == 1349) {
+        // **Oil temperature** (Byte 4)
+        carData.oilTemp = bytestouint(message.data, 4, 1) - 48;
+    }
+}
+
 void canBusLoop() {
   // Manage CAN-Bus connection
   if (!isCanBusConnected && isBleConnected) {
@@ -442,6 +497,7 @@ void canBusLoop() {
       Serial.printf("Ignoring pid: %d\n", message.identifier);
       continue;
     }
+    parseCAN(message);
     if (xQueueSend(xQueue1, &message, 0)) {
       ++can_queue_enqueue_count;
     } else {
