@@ -24,7 +24,7 @@ TFT_eSprite spr = TFT_eSprite(&tft);
 unsigned long lastButtonPress = 0;
 
 // **Create a struct instance to store received data**
-CarData receivedData;
+CarData carData;
 
 // **Parameter names for display**
 const char* paramNames[] = {
@@ -37,7 +37,7 @@ int currentParamIndex = 0;
 // **ESP-NOW Receive Callback**
 void onReceive(const esp_now_recv_info_t *recvInfo, const uint8_t *incomingData, int len) {
     if (len == sizeof(CarData)) {
-        memcpy(&receivedData, incomingData, sizeof(receivedData));
+        memcpy(&carData, incomingData, sizeof(carData));
         //Serial.println("New data received!");
         //updateDisplay();
     }
@@ -71,7 +71,7 @@ void checkButtons() {
 
 // **Update the display to show the current parameter**
 void updateDisplay() {
-  if(receivedData.rpm > 5500) {
+  if(carData.state.rpm > 5500) {
     spr.fillSprite(TFT_RED);
     spr.setTextColor(TFT_BLACK);
   } else {
@@ -89,14 +89,14 @@ void updateDisplay() {
   spr.setCursor(50, 100);
 
   switch (currentParamIndex) {
-    case 0: spr.printf("%d", receivedData.rpm); break;
-    case 1: spr.printf("%.1f C", receivedData.oilTemp); break;
-    case 2: spr.printf("%.1f C", receivedData.waterTemp); break;
-    case 3: spr.printf("%d%%", receivedData.accel); break;
-    case 4: spr.printf("%d%%", receivedData.brake); break;
-    case 5: spr.printf("%d%%", receivedData.clutch); break;
-    case 6: spr.printf("%.1f km/h", receivedData.speed); break;
-    case 7: spr.printf("Ratio %.1f", receivedData.rpm/receivedData.speed); break;
+    case 0: spr.printf("%d", carData.state.rpm); break;
+    case 1: spr.printf("%.1f C", carData.state.oilTemp); break;
+    case 2: spr.printf("%.1f C", carData.state.waterTemp); break;
+    case 3: spr.printf("%d%%", carData.state.accel); break;
+    case 4: spr.printf("%d%%", carData.state.brake); break;
+    case 5: spr.printf("%d%%", carData.state.clutch); break;
+    case 6: spr.printf("%.1f km/h", carData.state.speed); break;
+    case 7: spr.printf("Ratio %.1f", carData.state.rpm/carData.state.speed); break;
   }
 
   lcd_PushColors(0, 0, WIDTH, HEIGHT, (uint16_t *)spr.getPointer());

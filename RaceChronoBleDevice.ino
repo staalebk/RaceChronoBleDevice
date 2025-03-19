@@ -57,32 +57,35 @@ void setupESPNow() {
 }
 
 void sendDataTask(void *pvParameters) {
-    while (true) {
-        // Simulate data
-        /*
-        carData.rpm = random(1000, 7000);
-        carData.oilTemp = random(80, 120);
-        carData.waterTemp = random(70, 110);
-        carData.accel = random(0, 100);
-        carData.brake = random(0, 100);
-        carData.clutch = random(0, 100);
-        carData.speed = random(0, 200);
-        */
-        // Send data via ESP-NOW
-        esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *)&carData, sizeof(carData));
-        if (result != ESP_OK) {
-            Serial.println("Failed to send ESP-NOW packet");
-        } else {
-          /*
-          Serial.printf("Sent - RPM: %d, Oil Temp: %.1f, Water Temp: %.1f, Accel: %d%%, Brake: %d%%, Clutch: %d%%, Speed: %.1f km/h\n",
-              carData.rpm, carData.oilTemp, carData.waterTemp,
-              carData.accel, carData.brake, carData.clutch, carData.speed);
-          */
-          //Serial.print(".");
-        }
-
-        vTaskDelay(pdMS_TO_TICKS(30));
+  const TickType_t interval = pdMS_TO_TICKS(10); // X ms interval
+  TickType_t lastWakeTime = xTaskGetTickCount(); // Get initial time
+  while (true) {
+    // Simulate data
+    /*
+    carData.rpm = random(1000, 7000);
+    carData.oilTemp = random(80, 120);
+    carData.waterTemp = random(70, 110);
+    carData.accel = random(0, 100);
+    carData.brake = random(0, 100);
+    carData.clutch = random(0, 100);
+    carData.speed = random(0, 200);
+    */
+    //carData.clutch = random(0, 100);
+    // Send data via ESP-NOW
+    esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *)&carData, sizeof(carData));
+    if (result != ESP_OK) {
+        Serial.println("Failed to send ESP-NOW packet");
+    } else {
+      /*
+      Serial.printf("Sent - RPM: %d, Oil Temp: %.1f, Water Temp: %.1f, Accel: %d%%, Brake: %d%%, Clutch: %d%%, Speed: %.1f km/h\n",
+          carData.rpm, carData.oilTemp, carData.waterTemp,
+          carData.accel, carData.brake, carData.clutch, carData.speed);
+      */
+      //Serial.print(".");
     }
+
+    vTaskDelayUntil(&lastWakeTime, interval); // Wait until the next cycle
+  }
 }
 
 static bool canPidAllowed(uint32_t pid) {
@@ -248,6 +251,15 @@ void ble_setup() {
   Serial.printf("DEFAULT tx power: %d\n", esp_ble_tx_power_get(ESP_BLE_PWR_TYPE_DEFAULT));
 }
 
+void sendFakeCanMsgBle(){
+  uint32_t id = 0x1337;
+  int len = sizeof(carData.state);
+  static_assert(sizeof(carData.state) <= 16, "CAN packet can max be 16 bytes");
+  uint8_t buf[16] = {};
+  memcpy(buf, &carData.state, len);
+  sendCanMsgBle(id, buf, len);
+}
+
 void sendCanMsgBle(uint32_t id, uint8_t *data, uint8_t len) {
   if (!isBleConnected) {
     return;
@@ -401,27 +413,27 @@ bool bitstouint(const uint8_t *data, uint8_t bitPosition) {
 }
 
 // **Parse CAN message and update receivedData struct**
-void parseCAN(twai_message_t &message) {
-    if (message.identifier == 809) {
+void parseCAN(twai_message_t *message) {
+    if (message->identifier == 809) {
         // **Accelerator percentage** (Byte 5, full byte)
-        carData.accel = bytestouint(message.data, 5, 1) / 2.56;
+        carData.state.accel = bytestouint(message->data, 5, 1) / 2.56;
 
         // **Brake percentage** (Bit 55)
-        carData.brake = bitstouint(message.data, 55) * 100;
+        carData.state.brake = bitstouint(message->data, 55) * 100;
 
         // **Clutch percentage** (Bit 31)
-        carData.clutch = bitstouint(message.data, 31) * 100;
+        carData.state.clutch = bitstouint(message->data, 31) * 100;
 
         // **Coolant temperature** (Byte 1)
-        carData.waterTemp = (bytestouint(message.data, 1, 1) * 0.75) - 48;
+        carData.state.waterTemp = (bytestouint(message->data, 1, 1) * 0.75) - 48;
     } 
-    else if (message.identifier == 790) {
+    else if (message->identifier == 790) {
         // **RPM Calculation** (Little-Endian, Bytes 2-3)
-        carData.rpm = bytestouintle(message.data, 2, 2) * 0.15625;
+        carData.state.rpm = bytestouintle(message->data, 2, 2) * 0.15625;
     } 
-    else if (message.identifier == 1349) {
+    else if (message->identifier == 1349) {
         // **Oil temperature** (Byte 4)
-        carData.oilTemp = bytestouint(message.data, 4, 1) - 48;
+        carData.state.oilTemp = bytestouint(message->data, 4, 1) - 48;
     }
 }
 
@@ -438,7 +450,7 @@ void canBusLoop() {
       delay(3000);
       return;
     }
-  } else if (isCanBusConnected && !isBleConnected) {
+  } else if (isCanBusConnected && !isBleConnected && false) {
     // Disconnect from CAN-Bus
     twai_stop();
     isCanBusConnected = false;
@@ -497,8 +509,8 @@ void canBusLoop() {
       Serial.printf("Ignoring pid: %d\n", message.identifier);
       continue;
     }
-    parseCAN(message);
-    if (xQueueSend(xQueue1, &message, 0)) {
+    parseCAN(&message);
+    if (isBleConnected && xQueueSend(xQueue1, &message, 0)) {
       ++can_queue_enqueue_count;
     } else {
       ++can_queue_full_count;
@@ -508,10 +520,16 @@ void canBusLoop() {
 
 void taskSendBle(void *) {
   twai_message_t message;
+  const TickType_t interval = pdMS_TO_TICKS(10); // X ms interval
+  TickType_t lastWakeTime = xTaskGetTickCount(); // Get initial time
   for (;;) {
+    /*
     if (xQueueReceive(xQueue1, &message, pdMS_TO_TICKS(1000))) {
       sendCanMsgBle(message.identifier, message.data, message.data_length_code);
     }
+    */
+    sendFakeCanMsgBle();
+    vTaskDelayUntil(&lastWakeTime, interval); // Wait until the next cycle
   }
 }
 
@@ -551,7 +569,7 @@ void setup() {
   setupESPNow();
   xTaskCreatePinnedToCore(sendDataTask, "SendData", 4096, NULL, 1, NULL, 0);
   xTaskCreatePinnedToCore(taskCanBusLoop, "CAN bus reader", 16384, nullptr, 2, nullptr, 1);
-  //xTaskCreatePinnedToCore(taskPrintStats, "Statistics printer", 16384, nullptr, 1, nullptr, 1);
+  xTaskCreatePinnedToCore(taskPrintStats, "Statistics printer", 16384, nullptr, 1, nullptr, 1);
 }
 
 void taskCanBusLoop(void *) {

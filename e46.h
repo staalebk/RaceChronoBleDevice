@@ -3,17 +3,23 @@
 #include "esp32-hal-log.h"
 #include "hal/twai_types.h"
 
-struct __attribute__((packed)) CarData {
-  uint64_t magic;    // Magic bytes 
-  int rpm;           // Engine RPM
-  float oilTemp;     // Oil temperature (°C)
-  float waterTemp;   // Water temperature (°C)
-  float speed;       // Speed (km/h or mph)
-  uint8_t accel;     // Accelerator position (%)
-  uint8_t brake;     // Brake position (%)
-  uint8_t clutch;    // Clutch position (%)
+struct __attribute__((packed)) CarState {
+    uint8_t oilTemp;  // Oil temperature (°C)       1 1
+    uint8_t accel;    // Accelerator position (%)   1 2
+    uint8_t brake;    // Brake position (%)         1 3
+    uint8_t clutch;   // Clutch position (%)        1 4
+    float speed;      // Speed (km/h or mph)        4 8
+    uint16_t rpm;     // Engine RPM                 2 10
+    uint8_t waterTemp;// Water temperature (°C)     1 11
 
-  CarData() : magic(0x13371337),rpm(1337), oilTemp(113.0), waterTemp(96.7), accel(0), brake(0), clutch(0), speed(52.0) {}
+    CarState() : rpm(1337), oilTemp(66), waterTemp(69), speed(42.0), accel(1), brake(2), clutch(3) {}
+};
+
+struct __attribute__((packed)) CarData {
+    uint64_t magic;   // Magic bytes
+    CarState state;   // Nested struct
+
+    CarData() : magic(0x13371337) {}
 };
 
 // Declare a global instance to be shared across threads
