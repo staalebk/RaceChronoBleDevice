@@ -33,6 +33,7 @@ const char* paramNames[] = {
 
 // **Keep track of which parameter is displayed**
 int currentParamIndex = 0;
+int prevParamIndex = 0;
 
 // **ESP-NOW Receive Callback**
 void onReceive(const esp_now_recv_info_t *recvInfo, const uint8_t *incomingData, int len) {
@@ -90,13 +91,13 @@ void updateDisplay() {
 
   switch (currentParamIndex) {
     case 0: spr.printf("%d", carData.state.rpm); break;
-    case 1: spr.printf("%.1f C", carData.state.oilTemp); break;
-    case 2: spr.printf("%.1f C", carData.state.waterTemp); break;
+    case 1: spr.printf("%d C", carData.state.oilTemp); break;
+    case 2: spr.printf("%d C", carData.state.waterTemp); break;
     case 3: spr.printf("%d%%", carData.state.accel); break;
     case 4: spr.printf("%d%%", carData.state.brake); break;
     case 5: spr.printf("%d%%", carData.state.clutch); break;
     case 6: spr.printf("%.1f km/h", carData.state.speed); break;
-    case 7: spr.printf("Ratio %.1f", carData.state.rpm/carData.state.speed); break;
+    case 7: spr.printf("Ratio %.1f", carData.state.rpm*1.0/carData.state.speed); break;
   }
 
   lcd_PushColors(0, 0, WIDTH, HEIGHT, (uint16_t *)spr.getPointer());

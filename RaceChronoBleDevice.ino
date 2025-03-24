@@ -70,7 +70,7 @@ void sendDataTask(void *pvParameters) {
     carData.clutch = random(0, 100);
     carData.speed = random(0, 200);
     */
-    //carData.clutch = random(0, 100);
+    carData.state.clutch = random(0, 100);
     // Send data via ESP-NOW
     esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *)&carData, sizeof(carData));
     if (result != ESP_OK) {
