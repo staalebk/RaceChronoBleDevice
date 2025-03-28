@@ -26,10 +26,11 @@ unsigned long lastButtonPress = 0;
 // **Create a struct instance to store received data**
 CarData carData;
 
-#define PARAM_LEN 10
+#define PARAM_LEN 5
 // **Parameter names for display**
 const char* paramNames[] = {
-    "RPM", "Oil Temp", "Water Temp", "Accel", "Brake", "Clutch", "Speed", "Ratio", "FUELR", "FUELL"
+    //"RPM", "Oil Temp", "Water Temp", "Accel", "Brake", "Clutch", "Speed", "Ratio", "FUELR", "FUELL"
+    "RPM", "Oil Temp", "Water Temp", "Speed", "Ratio"
 };
 
 // **Keep track of which parameter is displayed**
@@ -94,13 +95,13 @@ void updateDisplay() {
     case 0: spr.printf("%d", carData.state.rpm); break;
     case 1: spr.printf("%d C", carData.state.oilTemp); break;
     case 2: spr.printf("%d C", carData.state.waterTemp); break;
-    case 3: spr.printf("%d%%", carData.state.accel); break;
-    case 4: spr.printf("%d%%", carData.state.brake); break;
-    case 5: spr.printf("%d%%", carData.state.clutch); break;
-    case 6: spr.printf("%.1f km/h", carData.state.speed); break;
-    case 7: spr.printf("Ratio %.1f", carData.state.rpm*1.0/carData.state.speed); break;
-    case 8: spr.printf("%d ?", carData.state.fuelr); break;
-    case 9: spr.printf("%d ?", carData.state.fuell); break;
+    //case 3: spr.printf("%d%%", carData.state.accel); break;
+    //case 4: spr.printf("%d%%", carData.state.brake); break;
+    //case 5: spr.printf("%d%%", carData.state.clutch); break;
+    case 3: spr.printf("%.1f km/h", carData.state.speed); break;
+    case 4: spr.printf("%.1f", carData.state.rpm*1.0/carData.state.speed); break;
+    //case 8: spr.printf("%d ?", carData.state.fuelr); break;
+    //case 9: spr.printf("%d ?", carData.state.fuell); break;
   }
 
   lcd_PushColors(0, 0, WIDTH, HEIGHT, (uint16_t *)spr.getPointer());
