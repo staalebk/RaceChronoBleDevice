@@ -26,9 +26,10 @@ unsigned long lastButtonPress = 0;
 // **Create a struct instance to store received data**
 CarData carData;
 
+#define PARAM_LEN 10
 // **Parameter names for display**
 const char* paramNames[] = {
-    "RPM", "Oil Temp", "Water Temp", "Accel", "Brake", "Clutch", "Speed", "Ratio"
+    "RPM", "Oil Temp", "Water Temp", "Accel", "Brake", "Clutch", "Speed", "Ratio", "FUELR", "FUELL"
 };
 
 // **Keep track of which parameter is displayed**
@@ -60,12 +61,12 @@ void checkButtons() {
 
     if (digitalRead(BUTTON_NEXT) == LOW) {
         lastButtonPress = millis();
-        currentParamIndex = (currentParamIndex + 1) % 8;
+        currentParamIndex = (currentParamIndex + 1) % PARAM_LEN;
         //updateDisplay();
     }
     if (digitalRead(BUTTON_PREV) == LOW) {
         lastButtonPress = millis();
-        currentParamIndex = (currentParamIndex - 1 + 8) % 8;
+        currentParamIndex = (currentParamIndex - 1 + PARAM_LEN) % PARAM_LEN;
         //updateDisplay();
     }
 }
@@ -98,6 +99,8 @@ void updateDisplay() {
     case 5: spr.printf("%d%%", carData.state.clutch); break;
     case 6: spr.printf("%.1f km/h", carData.state.speed); break;
     case 7: spr.printf("Ratio %.1f", carData.state.rpm*1.0/carData.state.speed); break;
+    case 8: spr.printf("%d ?", carData.state.fuelr); break;
+    case 9: spr.printf("%d ?", carData.state.fuell); break;
   }
 
   lcd_PushColors(0, 0, WIDTH, HEIGHT, (uint16_t *)spr.getPointer());
@@ -111,7 +114,7 @@ void setup() {
     pinMode(PIN_LED, OUTPUT);
     digitalWrite(PIN_LED, HIGH);
     rm67162_init();
-    lcd_setRotation(1);
+    lcd_setRotation(3);
     spr.createSprite(WIDTH, HEIGHT);
     spr.setSwapBytes(1);
 

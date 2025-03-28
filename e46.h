@@ -11,8 +11,10 @@ struct __attribute__((packed)) CarState {
     float speed;      // Speed (km/h or mph)        4 8
     uint16_t rpm;     // Engine RPM                 2 10
     uint8_t waterTemp;// Water temperature (°C)     1 11
+    uint8_t fuelr;
+    uint8_t fuell;
 
-    CarState() : rpm(1337), oilTemp(66), waterTemp(69), speed(42.0), accel(1), brake(2), clutch(3) {}
+    CarState() : rpm(1337), oilTemp(66), waterTemp(69), speed(42.0), accel(1), brake(2), clutch(3), fuelr(13), fuell(13) {}
 };
 
 struct __attribute__((packed)) CarData {
@@ -27,7 +29,7 @@ extern CarData carData;
 
 // CAN arbitration IDs for known messages.
 static constexpr uint32_t can_asc1_id = 0x153;
-//static constexpr uint32_t can_asc2_id = 0x1F0;
+static constexpr uint32_t can_asc2_id = 0x1F0;
 static constexpr uint32_t can_asc3_id = 0x1F3;
 //static constexpr uint32_t can_asc4_id = 0x1F8;
 //static constexpr uint32_t can_lws1_id = 0x1F5;

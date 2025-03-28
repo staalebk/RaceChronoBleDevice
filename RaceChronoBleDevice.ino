@@ -70,7 +70,7 @@ void sendDataTask(void *pvParameters) {
     carData.clutch = random(0, 100);
     carData.speed = random(0, 200);
     */
-    carData.state.clutch = random(0, 100);
+    //carData.state.clutch = random(0, 100);
     // Send data via ESP-NOW
     esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *)&carData, sizeof(carData));
     if (result != ESP_OK) {
@@ -91,7 +91,7 @@ void sendDataTask(void *pvParameters) {
 static bool canPidAllowed(uint32_t pid) {
   switch (pid) {
     case can_asc1_id:
-    //case can_asc2_id:
+    case can_asc2_id:
     case can_asc3_id:
     //case can_asc4_id:
     //case can_lws1_id:
@@ -136,7 +136,7 @@ void stats() {
   last_can_not_interested_count = can_not_interested_count;
   last_can_queue_enqueue_count = can_queue_enqueue_count;
   last_can_queue_full_count = can_queue_full_count;
-
+/*
   Serial.printf("ble_notify_count/s %llu, ", diff_ble_notify_count);
   Serial.printf("ble_notify_bytes/s %llu, ", diff_ble_notify_count * sizeof(twai_message_t));
   Serial.printf("ble_no_tx_buf_evt_count/s %llu, ", diff_ble_no_tx_buf_evt_count);
@@ -145,6 +145,7 @@ void stats() {
   Serial.printf("can_queue_enqueue_count/s %llu, ", diff_can_queue_enqueue_count);
   Serial.printf("can_queue_full_count/s %llu, ", diff_can_queue_full_count);
   Serial.println("");
+  */
 }
 
 class MyCanbusFilterCallbacks : public BLECharacteristicCallbacks {
@@ -349,6 +350,7 @@ static void hexDump(const uint8_t *pData, uint32_t length) {
     index++;
     if (index % 16 == 0) {
       ESP_LOGI(TAG, "%.4x %s %s", lineNumber * 16, hex, ascii);
+      Serial.printf("%s\n", hex);
       strcpy(ascii, "");
       strcpy(hex, "");
       lineNumber++;
@@ -360,6 +362,7 @@ static void hexDump(const uint8_t *pData, uint32_t length) {
       index++;
     }
     ESP_LOGI(TAG, "%.4x %s %s", lineNumber * 16, hex, ascii);
+    Serial.printf("%s\n", hex);
   }
 }  // hexDump
 
@@ -419,10 +422,10 @@ void parseCAN(twai_message_t *message) {
         carData.state.accel = bytestouint(message->data, 5, 1) / 2.56;
 
         // **Brake percentage** (Bit 55)
-        carData.state.brake = bitstouint(message->data, 55) * 100;
+        carData.state.brake = bitstouint(message->data, 48) * 100;
 
         // **Clutch percentage** (Bit 31)
-        carData.state.clutch = bitstouint(message->data, 31) * 100;
+        carData.state.clutch = bitstouint(message->data, 24) * 100;
 
         // **Coolant temperature** (Byte 1)
         carData.state.waterTemp = (bytestouint(message->data, 1, 1) * 0.75) - 48;
@@ -434,6 +437,43 @@ void parseCAN(twai_message_t *message) {
     else if (message->identifier == 1349) {
         // **Oil temperature** (Byte 4)
         carData.state.oilTemp = bytestouint(message->data, 4, 1) - 48;
+    }
+    else if (message->identifier == 0x153 && false) {
+        uint8_t vss_low_5 = (message->data[1] >> 3) & 0x1F;
+        uint16_t vss_high_8 = message->data[2];
+        uint16_t vss_raw = (vss_high_8 << 5) | vss_low_5;
+        //carData.state.speed = (vss_raw - 0x160) / 16;
+        static uint8_t counter = 0;
+        if (!counter) {
+          Serial.printf("low: %d high %d\n", vss_low_5, vss_high_8);
+          Serial.printf("Speed v1 %f\n", carData.state.speed);
+        }
+        // ( (HEX[MSB] * 256 + HEX[LSB]) - 352 ) / 127
+        //carData.state.speed = ((message->data[2] * 256 + message->data[1]) - 352) / 127;
+        if (!counter)
+          Serial.printf("Speed v2 %f\n", carData.state.speed);
+
+        counter++;
+          
+    }
+    else if (message->identifier == 0x613) {
+      static uint8_t counter = 0;
+      if (!counter++)
+        hexDump(message->data, message->data_length_code);
+      //Serial.printf("byte 2: %d byte 5: %d\n", message->data[2], message->data[5]);
+      carData.state.fuelr = message->data[2];
+      carData.state.fuell = message->data[5];
+    } else if (message->identifier == 0x1F0) {
+      static uint8_t counter = 0;
+      uint16_t raw1 = (message->data[1] << 8 & 0x0F) | message->data[0];
+      uint16_t raw2 = (message->data[3] << 8) | message->data[2];
+      uint16_t raw3 = (message->data[5] << 8) | message->data[4];
+      uint16_t raw4 = (message->data[7] << 8) | message->data[6];
+      float speed1 = (float)(raw1-7)/15.875;
+      float speed2 = (float)(raw2-7)/15.875;
+      float speed3 = (float)(raw3-7)/15.875;
+      float speed4 = (float)(raw4-7)/15.875;
+      carData.state.speed = speed4;
     }
 }
 
