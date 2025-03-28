@@ -20,7 +20,7 @@ TFT_eSprite spr = TFT_eSprite(&tft);
 #define BUTTON_NEXT  PIN_BUTTON_1  // Go to next value
 #define BUTTON_PREV  PIN_BUTTON_2  // Go to previous value
 
-#define DEBOUNCE_TIME  150   // Milliseconds
+#define DEBOUNCE_TIME  350   // Milliseconds
 unsigned long lastButtonPress = 0;
 
 // **Create a struct instance to store received data**

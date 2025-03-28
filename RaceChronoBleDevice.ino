@@ -465,10 +465,10 @@ void parseCAN(twai_message_t *message) {
       carData.state.fuell = message->data[5];
     } else if (message->identifier == 0x1F0) {
       static uint8_t counter = 0;
-      uint16_t raw1 = (message->data[1] << 8 & 0x0F) | message->data[0];
-      uint16_t raw2 = (message->data[3] << 8) | message->data[2];
-      uint16_t raw3 = (message->data[5] << 8) | message->data[4];
-      uint16_t raw4 = (message->data[7] << 8) | message->data[6];
+      uint16_t raw1 = (message->data[1] << 8 & 0x1F) | message->data[0];
+      uint16_t raw2 = (message->data[3] << 8 & 0x1F) | message->data[2];
+      uint16_t raw3 = (message->data[5] << 8 & 0x1F) | message->data[4];
+      uint16_t raw4 = (message->data[7] << 8 & 0x1F) | message->data[6];
       float speed1 = (float)(raw1-7)/15.875;
       float speed2 = (float)(raw2-7)/15.875;
       float speed3 = (float)(raw3-7)/15.875;
