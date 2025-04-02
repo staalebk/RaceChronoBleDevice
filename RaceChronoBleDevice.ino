@@ -253,12 +253,20 @@ void ble_setup() {
 }
 
 void sendFakeCanMsgBle(){
+  // First packet, state
   uint32_t id = 0x1337;
   int len = sizeof(carData.state);
   static_assert(sizeof(carData.state) <= 16, "CAN packet can max be 16 bytes");
   uint8_t buf[16] = {};
   memcpy(buf, &carData.state, len);
   sendCanMsgBle(id, buf, len);
+
+  // Second packet, state2
+  uint32_t id2 = 0x1338;
+  len = sizeof(carData.state2);
+  static_assert(sizeof(carData.state2) <= 16, "CAN2 packet can max be 16 bytes");
+  memcpy(buf, &carData.state2, len);
+  sendCanMsgBle(id2, buf, len);
 }
 
 void sendCanMsgBle(uint32_t id, uint8_t *data, uint8_t len) {
@@ -429,16 +437,34 @@ void parseCAN(twai_message_t *message) {
 
         // **Coolant temperature** (Byte 1)
         carData.state.waterTemp = (bytestouint(message->data, 1, 1) * 0.75) - 48;
+              static uint8_t counter = 0;
+      if (!counter++) {
+        Serial.printf("%d\n", message->identifier);
+        hexDump(message->data, message->data_length_code);
+        //Serial.printf("Speed: %f %f %f %f\n", speed1, speed2, speed3, speed4);
+      }
     } 
     else if (message->identifier == 790) {
         // **RPM Calculation** (Little-Endian, Bytes 2-3)
         carData.state.rpm = bytestouintle(message->data, 2, 2) * 0.15625;
+              static uint8_t counter = 0;
+      if (!counter++) {
+        Serial.printf("%d\n", message->identifier);
+        hexDump(message->data, message->data_length_code);
+        //Serial.printf("Speed: %f %f %f %f\n", speed1, speed2, speed3, speed4);
+      }
     } 
     else if (message->identifier == 1349) {
         // **Oil temperature** (Byte 4)
         carData.state.oilTemp = bytestouint(message->data, 4, 1) - 48;
+              static uint8_t counter = 0;
+      if (!counter++) {
+        Serial.printf("%d\n", message->identifier);
+        hexDump(message->data, message->data_length_code);
+        //Serial.printf("Speed: %f %f %f %f\n", speed1, speed2, speed3, speed4);
+      }
     }
-    else if (message->identifier == 0x153 && false) {
+    else if (message->identifier == 0x153) {
         uint8_t vss_low_5 = (message->data[1] >> 3) & 0x1F;
         uint16_t vss_high_8 = message->data[2];
         uint16_t vss_raw = (vss_high_8 << 5) | vss_low_5;
@@ -453,27 +479,52 @@ void parseCAN(twai_message_t *message) {
         if (!counter)
           Serial.printf("Speed v2 %f\n", carData.state.speed);
 
-        counter++;
+      if (!counter++) {
+        Serial.printf("%d\n", message->identifier);
+        hexDump(message->data, message->data_length_code);
+        //Serial.printf("Speed: %f %f %f %f\n", speed1, speed2, speed3, speed4);
+      }
           
     }
     else if (message->identifier == 0x613) {
       static uint8_t counter = 0;
-      if (!counter++)
+      if (!counter++) {
+        Serial.printf("%d\n", message->identifier);
         hexDump(message->data, message->data_length_code);
+        //Serial.printf("Speed: %f %f %f %f\n", speed1, speed2, speed3, speed4);
+      }
       //Serial.printf("byte 2: %d byte 5: %d\n", message->data[2], message->data[5]);
       carData.state.fuelr = message->data[2];
       carData.state.fuell = message->data[5];
     } else if (message->identifier == 0x1F0) {
       static uint8_t counter = 0;
-      uint16_t raw1 = (message->data[1] << 8 & 0x1F) | message->data[0];
-      uint16_t raw2 = (message->data[3] << 8 & 0x1F) | message->data[2];
-      uint16_t raw3 = (message->data[5] << 8 & 0x1F) | message->data[4];
-      uint16_t raw4 = (message->data[7] << 8 & 0x1F) | message->data[6];
+      uint16_t raw1 = ((message->data[1] & 0x1F) << 8) | message->data[0];
+      uint16_t raw2 = ((message->data[3] & 0x1F) << 8) | message->data[2];
+      uint16_t raw3 = ((message->data[5] & 0x1F) << 8) | message->data[4];
+      uint16_t raw4 = ((message->data[7] & 0x1F) << 8) | message->data[6];
       float speed1 = (float)(raw1-7)/15.875;
       float speed2 = (float)(raw2-7)/15.875;
       float speed3 = (float)(raw3-7)/15.875;
       float speed4 = (float)(raw4-7)/15.875;
-      carData.state.speed = speed4;
+      if (!counter++) {
+        //hexDump(message->data, message->data_length_code);
+        Serial.printf("%d ABS\n", message->identifier);
+        hexDump(message->data, message->data_length_code);
+        Serial.printf("Speed: %f %f %f %f\n", speed1, speed2, speed3, speed4);
+      }
+      carData.state.speed = speed1;
+      carData.state2.speed1 = speed1;
+      carData.state2.speed2 = speed2;
+      carData.state2.speed3 = speed3;
+      carData.state2.speed4 = speed4;
+    } else {
+      
+            static uint8_t counter = 0;
+      if (!counter++) {
+        Serial.printf("Unparsed %d\n", message->identifier);
+        hexDump(message->data, message->data_length_code);
+        //Serial.printf("Speed: %f %f %f %f\n", speed1, speed2, speed3, speed4);
+      }
     }
 }
 

@@ -39,7 +39,7 @@ int prevParamIndex = 0;
 
 // **ESP-NOW Receive Callback**
 void onReceive(const esp_now_recv_info_t *recvInfo, const uint8_t *incomingData, int len) {
-    if (len == sizeof(CarData)) {
+    if (len >= sizeof(CarData)) {
         memcpy(&carData, incomingData, sizeof(carData));
         //Serial.println("New data received!");
         //updateDisplay();

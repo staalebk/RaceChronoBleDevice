@@ -8,7 +8,7 @@ struct __attribute__((packed)) CarState {
     uint8_t accel;    // Accelerator position (%)   1 2
     uint8_t brake;    // Brake position (%)         1 3
     uint8_t clutch;   // Clutch position (%)        1 4
-    float speed;      // Speed (km/h or mph)        4 8
+    float speed;      // Speed (km/h)               4 8
     uint16_t rpm;     // Engine RPM                 2 10
     uint8_t waterTemp;// Water temperature (°C)     1 11
     uint8_t fuelr;
@@ -17,9 +17,19 @@ struct __attribute__((packed)) CarState {
     CarState() : rpm(1337), oilTemp(66), waterTemp(69), speed(42.0), accel(1), brake(2), clutch(3), fuelr(13), fuell(13) {}
 };
 
+struct __attribute__((packed)) CarState2 {
+    float speed1;      // Speed wheel 1(km/h)
+    float speed2;      // Speed wheel 2(km/h)
+    float speed3;      // Speed wheel 3(km/h)
+    float speed4;      // Speed wheel 4(km/h)
+
+    CarState2() : speed1(1), speed2(2), speed3(3), speed4(4) {}
+};
+
 struct __attribute__((packed)) CarData {
     uint64_t magic;   // Magic bytes
-    CarState state;   // Nested struct
+    CarState state;
+    CarState2 state2;
 
     CarData() : magic(0x13371337) {}
 };
